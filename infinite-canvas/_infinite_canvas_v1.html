@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>AI Studio Pro · 无限画布工作流 · 10 Agent 节点连线编辑器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:"Microsoft YaHei",sans-serif;font-size:13px;overflow:hidden;height:100vh;width:100vw}
+.top-bar{position:fixed;top:0;left:0;right:0;height:54px;background:#0e0e22;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;padding:0 16px;gap:10px;z-index:100}
+.top-title{color:#b794ff;font-size:15px;font-weight:700;letter-spacing:1px}
+.top-sub{color:#666;font-size:10px;margin-top:1px}
+.top-tools{display:flex;gap:6px;margin-left:20px}
+.tbtn{padding:6px 12px;background:#1a1a3a;border:1px solid #2a2a4a;color:#aaa;border-radius:4px;cursor:pointer;font-size:11px;transition:.15s}
+.tbtn:hover{background:#252550;color:#fff}
+.tbtn.active{background:#5a4ad9;color:#fff;border-color:#7c6df0;box-shadow:0 0 10px rgba(124,109,240,0.4)}
+.tbtn.danger:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.top-info{margin-left:auto;display:flex;gap:12px;align-items:center;font-size:11px}
+.info-pill{background:#1a1a3a;padding:4px 10px;border-radius:10px;color:#888}
+.info-pill b{color:#b794ff}
+.top-zoom{background:#1a1a3a;padding:4px 10px;border-radius:4px;display:flex;gap:6px;align-items:center}
+.top-zoom button{background:#252550;border:1px solid #3a3a6a;color:#fff;width:22px;height:22px;border-radius:3px;cursor:pointer;font-size:13px}
+.top-zoom button:hover{background:#3a3a7a}
+.zoom-val{color:#b794ff;min-width:40px;text-align:center;font-weight:700}
+
+.help-bar{position:fixed;bottom:0;left:0;right:0;height:32px;background:#0e0e22;border-top:1px solid #2a2a4a;display:flex;align-items:center;padding:0 16px;gap:18px;font-size:10.5px;color:#888;z-index:100}
+.help-bar b{color:#b794ff}
+.help-k{background:#1a1a3a;padding:2px 6px;border-radius:3px;color:#ccc;font-family:Consolas,monospace;font-size:10px}
+
+.canvas-wrap{position:fixed;top:54px;bottom:32px;left:0;right:0;overflow:hidden;cursor:grab;background:radial-gradient(circle at 20% 20%,#11112a 0%,#0a0a1a 70%)}
+.canvas-wrap.dragging{cursor:grabbing}
+.canvas-inner{position:absolute;top:0;left:0;width:100%;height:100%;transform-origin:0 0}
+.grid-bg{position:absolute;top:-5000px;left:-5000px;width:10000px;height:10000px;background-image:linear-gradient(rgba(120,120,200,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,120,200,0.05) 1px,transparent 1px);background-size:20px 20px;pointer-events:none}
+
+.svg-layer{position:absolute;top:0;left:0;width:10000px;height:10000px;pointer-events:none;overflow:visible}
+.edge{stroke:#5a4ad9;stroke-width:2;fill:none;pointer-events:stroke;cursor:pointer;transition:.15s}
+.edge:hover{stroke:#ef4444;stroke-width:3}
+.edge.selected{stroke:#facc15;stroke-width:3}
+.edge-dim{stroke:#999;stroke-dasharray:4 4;stroke-width:1.5;fill:none;pointer-events:none}
+.edge-arrow{fill:#5a4ad9;pointer-events:none}
+.edge-label{fill:#888;font-size:10px;font-family:Consolas,monospace;pointer-events:none;user-select:none}
+
+.node{position:absolute;background:#16162e;border:2px solid #3a3a6a;border-radius:8px;cursor:move;user-select:none;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.5);transition:box-shadow .15s,border-color .15s}
+.node:hover{box-shadow:0 6px 20px rgba(0,0,0,0.7),0 0 0 1px rgba(124,109,240,0.3)}
+.node.selected{border-color:#b794ff;box-shadow:0 0 0 2px rgba(183,148,255,0.4),0 6px 20px rgba(0,0,0,0.7)}
+.node-head{height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;border-radius:6px 6px 0 0;position:relative}
+.node-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;flex-shrink:0}
+.node-name{font-size:12px;font-weight:700;color:#fff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node-status{font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,0,0,0.3);color:#fff}
+.node-status.idle{background:#3a3a6a}
+.node-status.run{background:#22c55e}
+.node-status.wait{background:#facc15;color:#000}
+.node-status.err{background:#ef4444}
+.node-body{padding:8px 10px 10px 10px;font-size:10.5px;line-height:1.5}
+.node-role{color:#aaa;margin-bottom:4px;min-height:14px}
+.node-meta{display:flex;gap:6px;flex-wrap:wrap}
+.meta-tag{background:#252550;padding:2px 6px;border-radius:3px;font-size:9.5px;color:#888}
+.meta-tag b{color:#b794ff}
+.node-tools{display:flex;gap:4px;margin-top:6px}
+.nbtn{flex:1;padding:3px 6px;background:#252550;border:1px solid #3a3a6a;color:#aaa;border-radius:3px;cursor:pointer;font-size:9.5px;transition:.15s}
+.nbtn:hover{background:#3a3a7a;color:#fff}
+.nbtn.primary{background:#5a4ad9;border-color:#7c6df0;color:#fff}
+.nbtn.primary:hover{background:#6a5ae9}
+.nbtn.danger:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+
+.port{position:absolute;width:12px;height:12px;background:#5a4ad9;border:2px solid #fff;border-radius:50%;cursor:crosshair;z-index:2;transition:.15s}
+.port:hover{transform:scale(1.5);background:#b794ff;box-shadow:0 0 8px #b794ff}
+.port.in{background:#22c55e}
+.port.out{background:#3b82f6}
+.port.connecting{background:#facc15;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #facc15}50%{box-shadow:0 0 0 8px rgba(250,204,21,0)}}
+
+/* 抽屉 */
+.drawer-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:200;display:none}
+.drawer-mask.open{display:block;animation:fadein .2s}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:560px;background:#10102a;border-left:1px solid #2a2a4a;z-index:201;display:none;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,0.6)}
+.drawer.open{display:flex;animation:slidein .25s}
+@keyframes slidein{from{transform:translateX(560px)}to{transform:translateX(0)}}
+.drawer-head{height:54px;background:#16162e;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+.drawer-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;flex-shrink:0}
+.drawer-title{font-size:15px;font-weight:700;color:#fff;flex:1}
+.drawer-close{width:28px;height:28px;background:#252550;border:1px solid #3a3a6a;color:#aaa;border-radius:4px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.drawer-close:hover{background:#ef4444;color:#fff;border-color:#ef4444}
+.drawer-body{flex:1;overflow-y:auto;padding:14px}
+.drawer-body::-webkit-scrollbar{width:8px}
+.drawer-body::-webkit-scrollbar-thumb{background:#3a3a6a;border-radius:4px}
+.drawer-body::-webkit-scrollbar-track{background:#0a0a1a}
+
+.drawer-sec{background:#0e0e22;border:1px solid #2a2a4a;border-radius:6px;padding:12px;margin-bottom:10px}
+.drawer-sec h4{font-size:12px;color:#b794ff;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.drawer-sec h4::before{content:"";width:3px;height:12px;background:#5a4ad9;border-radius:2px}
+.cfg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+.cfg-row label{color:#888;min-width:80px;flex-shrink:0}
+.cfg-row input[type=text],.cfg-row input[type=number],.cfg-row select{flex:1;background:#0a0a1a;border:1px solid #2a2a4a;color:#e0e0e0;padding:5px 8px;border-radius:3px;font-size:11px;font-family:inherit}
+.cfg-row input:focus,.cfg-row select:focus{outline:none;border-color:#7c6df0}
+.cfg-row input[type=range]{flex:1;accent-color:#7c6df0}
+.cfg-row .range-val{min-width:36px;color:#b794ff;text-align:right;font-family:Consolas,monospace;font-weight:700}
+.cfg-row.chk label{display:flex;align-items:center;gap:4px;color:#ccc;cursor:pointer}
+.cfg-row.chk input{width:auto;flex:0;accent-color:#7c6df0}
+.io-list{display:flex;flex-direction:column;gap:4px}
+.io-item{background:#0a0a1a;border:1px solid #2a2a4a;border-radius:3px;padding:5px 8px;font-size:10.5px;display:flex;align-items:center;gap:6px}
+.io-item .io-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.io-item .io-dot.in{background:#22c55e}
+.io-item .io-dot.out{background:#3b82f6}
+.io-item .io-name{flex:1;color:#ccc}
+.io-item .io-arr{color:#888;font-family:Consolas,monospace}
+.io-item .io-id{color:#666;font-family:Consolas,monospace;font-size:9.5px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.kpi-cell{background:#0a0a1a;border:1px solid #2a2a4a;border-radius:3px;padding:6px;text-align:center}
+.kpi-cell .kv{color:#b794ff;font-size:14px;font-weight:700;font-family:Consolas,monospace}
+.kpi-cell .kl{color:#888;font-size:9.5px;margin-top:2px}
+.task-list{display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto}
+.task-list::-webkit-scrollbar{width:6px}
+.task-list::-webkit-scrollbar-thumb{background:#3a3a6a;border-radius:3px}
+.task-item{background:#0a0a1a;border:1px solid #2a2a4a;border-radius:3px;padding:5px 8px;font-size:10px;display:flex;align-items:center;gap:6px}
+.task-item .tst{padding:1px 5px;border-radius:6px;font-size:9px;flex-shrink:0;font-weight:700}
+.task-item .tst.idle{background:#3a3a6a;color:#aaa}
+.task-item .tst.run{background:#22c55e;color:#000}
+.task-item .tst.done{background:#3b82f6;color:#fff}
+.task-item .tst.fail{background:#ef4444;color:#fff}
+.task-item .tname{flex:1;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-item .tct{color:#666;font-size:9.5px;font-family:Consolas,monospace}
+
+
+/* V2: 右键菜单 */
+.ctx-menu{position:fixed;background:#16162e;border:1px solid #2a2a4a;border-radius:6px;padding:4px;z-index:500;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.7);display:none}
+.ctx-menu.open{display:block;animation:fadein .12s}
+.ctx-item{padding:7px 12px;font-size:11.5px;color:#ccc;cursor:pointer;border-radius:3px;display:flex;align-items:center;gap:8px;user-select:none}
+.ctx-item:hover{background:#252550;color:#fff}
+.ctx-item.danger{color:#ef4444}
+.ctx-item.danger:hover{background:#ef4444;color:#fff}
+.ctx-sep{height:1px;background:#2a2a4a;margin:4px 0}
+.ctx-head{padding:6px 12px;font-size:10px;color:#b794ff;font-weight:700;letter-spacing:1px;border-bottom:1px solid #2a2a4a;margin-bottom:4px;background:linear-gradient(90deg,#5a4ad933,transparent);border-radius:3px 3px 0 0}
+.ctx-sub{padding:4px 12px;font-size:10px;color:#888;cursor:default}
+.ctx-item.disabled{color:#555;cursor:not-allowed}
+.ctx-item.disabled:hover{background:transparent;color:#555}
+
+/* 提示/Toast */
+.toast{position:fixed;top:74px;left:50%;transform:translateX(-50%);background:#16162e;border:1px solid #5a4ad9;color:#fff;padding:8px 16px;border-radius:4px;z-index:300;font-size:12px;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
+.toast.open{display:block;animation:toastin .25s}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* 提示对话框 */
+.dialog-mask{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:400;display:none;align-items:center;justify-content:center}
+.dialog-mask.open{display:flex}
+.dialog{background:#10102a;border:1px solid #2a2a4a;border-radius:8px;padding:20px;min-width:340px;max-width:500px;box-shadow:0 8px 32px rgba(0,0,0,0.6)}
+.dialog h3{font-size:14px;color:#b794ff;margin-bottom:12px}
+.dialog p{font-size:12px;color:#ccc;margin-bottom:16px;line-height:1.6}
+.dialog-btns{display:flex;gap:8px;justify-content:flex-end}
+.dbtn{padding:6px 16px;background:#252550;border:1px solid #3a3a6a;color:#aaa;border-radius:4px;cursor:pointer;font-size:11px}
+.dbtn:hover{background:#3a3a7a;color:#fff}
+.dbtn.primary{background:#5a4ad9;border-color:#7c6df0;color:#fff}
+.dbtn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <div>
+    <div class="top-title">⚙️ AI Studio Pro · 无限画布工作流</div>
+    <div class="top-sub">10 Agent 节点 · 左键拖空白 = 平移 · 拖端口 = 连线 · 右键 = 功能菜单 · 滚轮 = 缩放</div>
+  </div>
+  <div class="top-tools">
+    <div class="tbtn" onclick="autoLayout()">🔄 自动布局</div>
+    <div class="tbtn" onclick="runAll()">▶ 全部运行</div>
+    <div class="tbtn" onclick="stopAll()">⏹ 全部停止</div>
+    <div class="tbtn" onclick="exportWorkflow()">💾 导出</div>
+    <div class="tbtn" onclick="importWorkflow()">📂 导入</div>
+    <div class="tbtn" onclick="resetWorkflow()">↺ 重置</div>
+  </div>
+  <div class="top-info">
+    <div class="info-pill">节点 <b id="statNode">10</b></div>
+    <div class="info-pill">连线 <b id="statEdge">11</b></div>
+    <div class="info-pill">运行 <b id="statRun">0</b></div>
+    <div class="top-zoom">
+      <button onclick="zoom(0.8)">-</button>
+      <span class="zoom-val" id="zoomVal">100%</span>
+      <button onclick="zoom(1.25)">+</button>
+    </div>
+  </div>
+</div>
+
+<div class="help-bar">
+  <span><b>平移</b> <span class="help-k">左键拖</span> 空白</span>
+  <span><b>缩放</b> 鼠标滚轮</span>
+  <span><b>拖动</b> <span class="help-k">左键拖</span> 节点</span>
+  <span><b>连线</b> <span class="help-k">左键拖</span> 端口到端口</span>
+  <span><b>详情</b> <span class="help-k">双击</span> 节点</span>
+  <span><b>删除</b> <span class="help-k">右键</span> 节点/连线</span>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <div class="canvas-inner" id="canvasInner">
+    <div class="grid-bg"></div>
+    <svg class="svg-layer" id="svgLayer" viewBox="0 0 10000 10000">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill="#5a4ad9"/>
+        </marker>
+        <marker id="arrowSel" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L9,3 z" fill="#facc15"/>
+        </marker>
+      </defs>
+      <g id="svgEdges"></g>
+      <path id="tempEdge" class="edge-dim" style="display:none" marker-end="url(#arrow)"></path>
+    </svg>
+    <div id="nodesLayer"></div>
+  </div>
+</div>
+
+<div class="drawer-mask" id="drawerMask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-num" id="drNum"></div>
+    <div class="drawer-title" id="drTitle"></div>
+    <div class="drawer-close" onclick="closeDrawer()">✕</div>
+  </div>
+  <div class="drawer-body" id="drBody"></div>
+</div>
+
+<div class="dialog-mask" id="dialogMask">
+  <div class="dialog" id="dialog">
+    <h3 id="dlgTitle">确认</h3>
+    <p id="dlgMsg"></p>
+    <div class="dialog-btns">
+      <div class="dbtn" id="dlgCancel" onclick="closeDialog()">取消</div>
+      <div class="dbtn primary" id="dlgOk">确定</div>
+    </div>
+  </div>
+</div>
+
+
+<div class="ctx-menu" id="ctxMenu"></div>
+<div class="toast" id="toast"></div>
+
+<input type="file" id="fileInput" style="display:none" accept=".json" onchange="handleImport(event)">
+
+<script>
+// ========================== 数据 ==========================
+const AGENT_DEFS = [
+  {num:0,name:'总控',role:'全局调度 · 任务分派 · 状态监控',color:'#facc15',tools:['任务队列','Agent 路由','状态同步','异常告警'],status:'idle',inputCount:2,outputCount:3,taskTotal:5,note:'总控中心：所有任务经过此节点分发'},
+  {num:1,name:'编剧',role:'剧本生成 · 角色提取 · 场景识别',color:'#6b8cff',tools:['GPT-4','Claude','Qwen'],status:'idle',inputCount:1,outputCount:2,taskTotal:3,note:'输入：故事大纲 / 输出：结构化剧本'},
+  {num:2,name:'拆镜',role:'剧本拆解 · 镜头列表 · 节奏控制',color:'#60a5fa',tools:['场景分割','镜头识别','时长估算'],status:'idle',inputCount:1,outputCount:2,taskTotal:8,note:'9 宫格模板 + 关键帧'},
+  {num:3,name:'资产生成',role:'角色/场景/道具 6+4+8 设计',color:'#a78bfa',tools:['SD','FLUX','Midjourney'],status:'idle',inputCount:1,outputCount:3,taskTotal:18,note:'6 角色 + 4 场景 + 8 道具'},
+  {num:4,name:'分镜编排',role:'9 宫格模板 · 关键帧 · 镜头参数',color:'#4ade80',tools:['关键帧','镜头参数','运镜指令'],status:'idle',inputCount:2,outputCount:3,taskTotal:24,note:'每个镜头关键帧 + 12 维度评分'},
+  {num:5,name:'视频生成',role:'图生视频 · 首尾帧插值',color:'#f97316',tools:['Veo','Sora','可灵','Seedance'],status:'idle',inputCount:2,outputCount:1,taskTotal:24,note:'12 镜头 × 关键帧驱动'},
+  {num:6,name:'音频生成',role:'6 角色 TTS · BGM · 音效',color:'#ec4899',tools:['TTS','BGM','SFX'],status:'idle',inputCount:1,outputCount:1,taskTotal:6,note:'6 角色音色 + 配乐'},
+  {num:7,name:'视频合成',role:'拼接 · 字幕 · BGM',color:'#14b8a6',tools:['FFmpeg','字幕烧录','BGM 混合'],status:'idle',inputCount:2,outputCount:1,taskTotal:1,note:'整剧拼接 + 字幕烧录'},
+  {num:8,name:'质检',role:'12 维度质量评分 · 85 分门槛',color:'#ef4444',tools:['角色一致性','场景一致性','风格一致性'],status:'idle',inputCount:1,outputCount:2,taskTotal:24,note:'12 维度评分 + 自动回退'},
+  {num:9,name:'审片',role:'人工审片 · 反馈 · 修改指令',color:'#84cc16',tools:['预览','批注','派单'],status:'idle',inputCount:1,outputCount:1,taskTotal:1,note:'最终审片 + 反馈回路'}
+];
+
+const NODE_W = 220, NODE_H = 140;
+const GRID_GAP = 50;
+
+// 默认布局：2 行 5 列
+function defaultLayout(){
+  return AGENT_DEFS.map((a,i)=>({
+    id:'n'+a.num,
+    num:a.num,
+    name:a.name,
+    role:a.role,
+    color:a.color,
+    tools:a.tools,
+    status:a.status,
+    inputCount:a.inputCount,
+    outputCount:a.outputCount,
+    taskTotal:a.taskTotal,
+    note:a.note,
+    x:50 + (i%5) * (NODE_W + GRID_GAP),
+    y:50 + Math.floor(i/5) * (NODE_H + GRID_GAP)
+  }));
+}
+
+const DEFAULT_EDGES = [
+  {from:'n0',to:'n1',label:'派发'},
+  {from:'n1',to:'n2',label:'剧本'},
+  {from:'n2',to:'n3',label:'拆镜'},
+  {from:'n3',to:'n4',label:'资产'},
+  {from:'n4',to:'n5',label:'分镜'},
+  {from:'n4',to:'n6',label:'分镜'},
+  {from:'n5',to:'n7',label:'视频'},
+  {from:'n6',to:'n7',label:'音频'},
+  {from:'n7',to:'n8',label:'成片'},
+  {from:'n8',to:'n9',label:'通过'},
+  {from:'n8',to:'n4',label:'打回重做',type:'feedback'}
+];
+
+// ========================== 状态 ==========================
+let state = {
+  nodes: defaultLayout(),
+  edges: JSON.parse(JSON.stringify(DEFAULT_EDGES)),
+  canvas: {x:0, y:0, scale:1},
+  mode: 'select',
+  selectedNode: null,
+  selectedEdge: null,
+  dragging: null,
+  connecting: null,
+  panning: false,
+  panStart: null,
+  running: false,
+  runTimer: null
+};
+
+// ========================== 工具 ==========================
+function $(id){return document.getElementById(id)}
+function showToast(msg, dur=2000){
+  const t=$('toast');
+  t.textContent=msg;
+  t.classList.add('open');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('open'),dur);
+}
+function showDialog(title, msg, okText='确定', okCb=null, danger=false){
+  $('dlgTitle').textContent=title;
+  $('dlgMsg').textContent=msg;
+  const ok=$('dlgOk');
+  ok.textContent=okText;
+  ok.className='dbtn'+(danger?' danger':' primary');
+  ok.onclick=()=>{closeDialog();if(okCb)okCb()};
+  $('dialogMask').classList.add('open');
+}
+function closeDialog(){$('dialogMask').classList.remove('open')}
+
+// ========================== 模式 ==========================
+// V3: 删除 setMode 函数 - 无 mode 概念，左键拖空白=平移，右键=菜单
+
+// ========================== 渲染节点 ==========================
+function renderNodes(){
+  const layer = $('nodesLayer');
+  layer.innerHTML = '';
+  state.nodes.forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'node' + (state.selectedNode===n.id?' selected':'');
+    div.id = n.id;
+    div.style.left = n.x+'px';
+    div.style.top = n.y+'px';
+    div.style.width = NODE_W+'px';
+    div.style.minHeight = NODE_H+'px';
+    div.dataset.nid = n.id;
+    div.innerHTML = `
+      <div class="node-head" style="background:linear-gradient(90deg,${n.color}33,transparent)">
+        <div class="node-num" style="background:${n.color}">${n.num}</div>
+        <div class="node-name">${n.name} Agent</div>
+        <div class="node-status ${n.status}">${n.status==='idle'?'空闲':n.status==='run'?'运行中':n.status==='wait'?'等待':'错误'}</div>
+      </div>
+      <div class="node-body">
+        <div class="node-role">${n.role}</div>
+        <div class="node-meta">
+          <span class="meta-tag">入 <b>${n.inputCount}</b></span>
+          <span class="meta-tag">出 <b>${n.outputCount}</b></span>
+          <span class="meta-tag">任务 <b>${n.taskDone||0}/${n.taskTotal}</b></span>
+        </div>
+        <div class="node-tools">
+          <div class="nbtn primary" data-act="open">📂 详情</div>
+          <div class="nbtn" data-act="run">▶ 运行</div>
+          <div class="nbtn danger" data-act="del">🗑</div>
+        </div>
+      </div>
+    `;
+    // 端口：左 1 个 in，右 1 个 out；上中下可选
+    const inP = document.createElement('div');
+    inP.className='port in';
+    inP.style.left='-7px';inP.style.top='50%';inP.style.marginTop='-7px';
+    inP.dataset.nid=n.id;inP.dataset.dir='in';
+    inP.dataset.idx='0';
+    div.appendChild(inP);
+
+    const outP = document.createElement('div');
+    outP.className='port out';
+    outP.style.right='-7px';outP.style.left='auto';outP.style.top='50%';outP.style.marginTop='-7px';
+    outP.dataset.nid=n.id;outP.dataset.dir='out';
+    outP.dataset.idx='0';
+    div.appendChild(outP);
+
+    layer.appendChild(div);
+  });
+  bindNodeEvents();
+  renderEdges();
+}
+
+// ========================== 渲染连线 ==========================
+function getPortPos(nid, dir){
+  const n = state.nodes.find(x=>x.id===nid);
+  if(!n) return null;
+  // 输入端口左中，输出端口右中
+  const x = dir==='out' ? n.x + NODE_W : n.x;
+  const y = n.y + 70; // 头部中间
+  return {x,y};
+}
+
+function renderEdges(){
+  const g = $('svgEdges');
+  g.innerHTML = '';
+  state.edges.forEach((e,idx)=>{
+    const a = getPortPos(e.from, 'out');
+    const b = getPortPos(e.to, 'in');
+    if(!a||!b) return;
+    // 贝塞尔折线
+    const dx = (b.x - a.x) * 0.5;
+    const path = `M ${a.x} ${a.y} C ${a.x+dx} ${a.y}, ${b.x-dx} ${b.y}, ${b.x} ${b.y}`;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', path);
+    p.setAttribute('class','edge'+(state.selectedEdge===idx?' selected':''));
+    p.setAttribute('marker-end', state.selectedEdge===idx?'url(#arrowSel)':'url(#arrow)');
+    p.dataset.idx = idx;
+    g.appendChild(p);
+
+    if(e.label){
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2 - 4;
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', mx);t.setAttribute('y', my);
+      t.setAttribute('class','edge-label');
+      t.setAttribute('text-anchor','middle');
+      t.textContent = e.label;
+      g.appendChild(t);
+    }
+  });
+}
+
+function renderEdgeClickable(){
+  // 绑定连线 click
+  document.querySelectorAll('#svgEdges .edge').forEach(p=>{
+    p.style.pointerEvents='stroke';
+    p.onclick = (e)=>{
+      e.stopPropagation();
+      const idx = parseInt(p.dataset.idx);
+      // V3: 删 mode='delete' 检查（无 mode 概念，删除走右键菜单）
+      state.selectedEdge = idx;
+      state.selectedNode = null;
+      renderNodes();
+      renderEdges();
+      showToast('已选中连线 '+state.edges[idx].from+' → '+state.edges[idx].to);
+    };
+    p.addEventListener('contextmenu', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const idx = parseInt(p.dataset.idx);
+      showEdgeCtxMenu(e.clientX, e.clientY, idx);
+    });
+  });
+}
+
+// ========================== 节点事件 ==========================
+function bindNodeEvents(){
+  document.querySelectorAll('.node').forEach(div=>{
+    const nid = div.dataset.nid;
+
+    // 节点拖动
+    div.addEventListener('mousedown', e=>{
+      if(e.target.classList.contains('port')) return;
+      if(e.target.dataset.act) return; // 按钮
+      // V3: 删 mode='delete' 检查（无 mode 概念，删除走右键）
+      e.preventDefault();
+      e.stopPropagation();
+      state.selectedNode = nid;
+      state.selectedEdge = null;
+      const n = state.nodes.find(x=>x.id===nid);
+      const pt = screenToCanvas(e.clientX, e.clientY);
+      state.dragging = {type:'node', id:nid, dx:pt.x - n.x, dy:pt.y - n.y};
+      renderNodes();
+    });
+
+    // 节点按钮
+    div.querySelectorAll('[data-act]').forEach(btn=>{
+      btn.addEventListener('mousedown', e=>e.stopPropagation());
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const act = btn.dataset.act;
+        if(act==='open') openDrawer(nid);
+        else if(act==='run') runAgent(nid);
+        else if(act==='del') {
+          showDialog('删除节点', '确定删除该节点？', '删除', ()=>{
+            state.nodes = state.nodes.filter(n=>n.id!==nid);
+            state.edges = state.edges.filter(e=>e.from!==nid && e.to!==nid);
+            renderNodes();
+            updateStats();
+          }, true);
+        }
+      });
+    });
+
+    // 双击节点 → 详情
+    div.addEventListener('dblclick', e=>{
+      e.stopPropagation();
+      openDrawer(nid);
+    });
+    // V2: 节点右键 → 节点菜单
+    div.addEventListener('contextmenu', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      showNodeCtxMenu(e.clientX, e.clientY, nid);
+    });
+  });
+
+  // 端口拖动
+  document.querySelectorAll('.port').forEach(p=>{
+    p.addEventListener('mousedown', e=>{
+      // V2: 解除限制，任何 mode 都能拖端口画线
+      e.preventDefault();
+      e.stopPropagation();
+      const nid = p.dataset.nid;
+      const dir = p.dataset.dir;
+      if(dir!=='out'){
+        showToast('请从「输出端口」（右侧）拖到「输入端口」（左侧）');
+        return;
+      }
+      state.connecting = {fromNid: nid, fromDir:'out'};
+      p.classList.add('connecting');
+      const pt = screenToCanvas(e.clientX, e.clientY);
+      const temp = $('tempEdge');
+      temp.style.display='block';
+      const a = getPortPos(nid, 'out');
+      temp.setAttribute('d', `M ${a.x} ${a.y} C ${a.x+50} ${a.y}, ${pt.x-50} ${pt.y}, ${pt.x} ${pt.y}`);
+      temp.setAttribute('marker-end','url(#arrow)');
+    });
+  });
+}
+
+// ========================== 画布坐标转换 ==========================
+function screenToCanvas(sx, sy){
+  const wrap = $('canvasWrap').getBoundingClientRect();
+  const x = (sx - wrap.left - state.canvas.x) / state.canvas.scale;
+  const y = (sy - wrap.top - state.canvas.y) / state.canvas.scale;
+  return {x,y};
+}
+
+function applyTransform(){
+  $('canvasInner').style.transform = `translate(${state.canvas.x}px, ${state.canvas.y}px) scale(${state.canvas.scale})`;
+  $('zoomVal').textContent = Math.round(state.canvas.scale*100)+'%';
+}
+
+// ========================== 画布事件 ==========================
+const wrap = $('canvasWrap');
+let spaceDown = false;
+
+document.addEventListener('keydown', e=>{
+  if(e.key===' '){spaceDown=true;wrap.style.cursor='grab';}
+  if(e.key==='Delete'||e.key==='Backspace'){
+    if(document.activeElement && (document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='SELECT'||document.activeElement.tagName==='TEXTAREA')) return;
+    if(state.selectedNode){
+      const n = state.nodes.find(x=>x.id===state.selectedNode);
+      showDialog('删除节点', '确定删除 "'+n.name+' Agent"？', '删除', ()=>{
+        state.nodes = state.nodes.filter(n=>n.id!==state.selectedNode);
+        state.edges = state.edges.filter(e=>e.from!==state.selectedNode && e.to!==state.selectedNode);
+        state.selectedNode = null;
+        renderNodes();
+        updateStats();
+      }, true);
+    } else if(state.selectedEdge!==null){
+      showDialog('删除连线', '确定删除该连线？', '删除', ()=>{
+        state.edges.splice(state.selectedEdge,1);
+        state.selectedEdge = null;
+        renderNodes();
+        updateStats();
+      }, true);
+    }
+  }
+  if(e.key==='Escape'){
+    state.selectedNode=null;state.selectedEdge=null;
+    state.connecting=null;$('tempEdge').style.display='none';
+    renderNodes();
+    closeDrawer();
+  }
+});
+document.addEventListener('keyup', e=>{
+  if(e.key===' '){spaceDown=false;}
+});
+
+wrap.addEventListener('mousedown', e=>{
+  // V3: 左键拖空白 = 平移画布（任何时候都平移）
+  if(e.button===0 || e.button===1){
+    e.preventDefault();
+    state.panning = true;
+    state.panStart = {mx:e.clientX, my:e.clientY, cx:state.canvas.x, cy:state.canvas.y};
+    wrap.classList.add('dragging');
+    return;
+  }
+  if(e.target===wrap || e.target.classList.contains('grid-bg') || e.target.id==='svgLayer' || e.target.id==='nodesLayer'){
+    state.selectedNode = null;
+    state.selectedEdge = null;
+    renderNodes();
+  }
+});
+
+document.addEventListener('mousemove', e=>{
+  if(state.panning){
+    state.canvas.x = state.panStart.cx + (e.clientX - state.panStart.mx);
+    state.canvas.y = state.panStart.cy + (e.clientY - state.panStart.my);
+    applyTransform();
+    return;
+  }
+  if(state.dragging && state.dragging.type==='node'){
+    const pt = screenToCanvas(e.clientX, e.clientY);
+    const n = state.nodes.find(x=>x.id===state.dragging.id);
+    // V2: 解除负坐标限制，节点可拖到任意位置
+    n.x = pt.x - state.dragging.dx;
+    n.y = pt.y - state.dragging.dy;
+    const div = $(n.id);
+    if(div){div.style.left=n.x+'px';div.style.top=n.y+'px';}
+    renderEdges();
+    return;
+  }
+  if(state.connecting){
+    const pt = screenToCanvas(e.clientX, e.clientY);
+    const a = getPortPos(state.connecting.fromNid, 'out');
+    const temp = $('tempEdge');
+    temp.setAttribute('d', `M ${a.x} ${a.y} C ${a.x+50} ${a.y}, ${pt.x-50} ${pt.y}, ${pt.x} ${pt.y}`);
+  }
+});
+
+document.addEventListener('mouseup', e=>{
+  if(state.panning){
+    state.panning = false;
+    wrap.classList.remove('dragging');
+  }
+  if(state.dragging){
+    state.dragging = null;
+  }
+  if(state.connecting){
+    // 检查是否在某个输入端口上
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if(el && el.classList.contains('port')){
+      const toNid = el.dataset.nid;
+      // V2: 解除限制 - 任意方向、允许重复、允许自连
+      state.edges.push({from:state.connecting.fromNid, to:toNid, label:''});
+      updateStats();
+      showToast('已连线: '+state.connecting.fromNid+' → '+toNid);
+    }
+    state.connecting = null;
+    $('tempEdge').style.display='none';
+    document.querySelectorAll('.port.connecting').forEach(p=>p.classList.remove('connecting'));
+    renderEdges();
+  }
+});
+
+// V2: 画布空白右键 → 添加节点菜单
+wrap.addEventListener('contextmenu', e=>{
+  // 检查是否在节点或连线上
+  if(e.target.closest('.node') || e.target.closest('.edge')) return;
+  e.preventDefault();
+  showCanvasCtxMenu(e.clientX, e.clientY, e);
+});
+wrap.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const factor = e.deltaY<0 ? 1.1 : 1/1.1;
+  const wrapRect = wrap.getBoundingClientRect();
+  const mx = e.clientX - wrapRect.left;
+  const my = e.clientY - wrapRect.top;
+  // 缩放时保持鼠标位置不动
+  const newScale = Math.max(0.3, Math.min(2.5, state.canvas.scale * factor));
+  const realFactor = newScale / state.canvas.scale;
+  state.canvas.x = mx - (mx - state.canvas.x) * realFactor;
+  state.canvas.y = my - (my - state.canvas.y) * realFactor;
+  state.canvas.scale = newScale;
+  applyTransform();
+}, {passive:false});
+
+function zoom(f){
+  const wrapRect = wrap.getBoundingClientRect();
+  const mx = wrapRect.width/2, my = wrapRect.height/2;
+  const newScale = Math.max(0.3, Math.min(2.5, state.canvas.scale * f));
+  const realFactor = newScale / state.canvas.scale;
+  state.canvas.x = mx - (mx - state.canvas.x) * realFactor;
+  state.canvas.y = my - (my - state.canvas.y) * realFactor;
+  state.canvas.scale = newScale;
+  applyTransform();
+}
+
+// ========================== 抽屉 ==========================
+function openDrawer(nid){
+  const n = state.nodes.find(x=>x.id===nid);
+  if(!n) return;
+  state.selectedNode = nid;
+  renderNodes();
+  $('drNum').textContent = n.num;
+  $('drNum').style.background = n.color;
+  $('drTitle').textContent = n.num + ' 号 · ' + n.name + ' Agent';
+
+  const ins = state.edges.filter(e=>e.to===nid).map(e=>e.from);
+  const outs = state.edges.filter(e=>e.from===nid).map(e=>e.to);
+
+  const tasks = Array.from({length:Math.min(n.taskTotal,6)}, (_,i)=>({
+    name: n.name+' - 任务 '+(i+1),
+    st: i<((n.taskDone||0))?'done':(i===(n.taskDone||0)?'run':'idle')
+  }));
+
+  $('drBody').innerHTML = `
+    <div class="drawer-sec">
+      <h4>角色职责</h4>
+      <div class="node-role" style="font-size:11.5px;color:#ccc;line-height:1.6">${n.role}</div>
+      <div style="font-size:10.5px;color:#888;margin-top:6px;font-style:italic">💡 ${n.note}</div>
+    </div>
+
+    <div class="drawer-sec">
+      <h4>数据流向</h4>
+      <div class="cfg-row"><label style="min-width:60px">上游入</label>
+        <div class="io-list" style="flex:1">
+          ${ins.length?ins.map(i=>`<div class="io-item"><span class="io-dot in"></span><span class="io-name">${state.nodes.find(x=>x.id===i)?.name||i} Agent</span><span class="io-id">${i}</span></div>`).join(''):'<div class="io-item" style="color:#666">无</div>'}
+        </div>
+      </div>
+      <div class="cfg-row"><label style="min-width:60px">下游出</label>
+        <div class="io-list" style="flex:1">
+          ${outs.length?outs.map(i=>`<div class="io-item"><span class="io-dot out"></span><span class="io-name">${state.nodes.find(x=>x.id===i)?.name||i} Agent</span><span class="io-id">${i}</span></div>`).join(''):'<div class="io-item" style="color:#666">无</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-sec">
+      <h4>运行指标</h4>
+      <div class="kpi-row">
+        <div class="kpi-cell"><div class="kv">${n.taskDone||0}</div><div class="kl">已完成</div></div>
+        <div class="kpi-cell"><div class="kv">${n.taskTotal}</div><div class="kl">总任务</div></div>
+        <div class="kpi-cell"><div class="kv">${n.inputCount}</div><div class="kl">入度</div></div>
+        <div class="kpi-cell"><div class="kv">${n.outputCount}</div><div class="kl">出度</div></div>
+      </div>
+    </div>
+
+    <div class="drawer-sec">
+      <h4>工具 / 模型</h4>
+      ${n.tools.map(t=>`<span class="meta-tag" style="margin:2px;display:inline-block">${t}</span>`).join('')}
+    </div>
+
+    <div class="drawer-sec">
+      <h4>配置参数</h4>
+      <div class="cfg-row"><label>名称</label><input type="text" value="${n.name} Agent" data-cfg="name"></div>
+      <div class="cfg-row"><label>并发数</label><input type="number" value="3" min="1" max="20" data-cfg="parallel"></div>
+      <div class="cfg-row"><label>超时(秒)</label><input type="number" value="60" min="10" max="600" data-cfg="timeout"></div>
+      <div class="cfg-row"><label>主模型</label>
+        <select data-cfg="model">
+          <option>${n.tools[0]||'Default'}</option>
+          ${(n.tools.slice(1)||[]).map(t=>`<option>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="cfg-row"><label>重试次数</label><input type="number" value="3" min="0" max="10" data-cfg="retry"></div>
+      <div class="cfg-row chk"><label><input type="checkbox" data-cfg="auto" checked> 自动执行</label>
+      <label><input type="checkbox" data-cfg="strict"> 严格质检</label></div>
+    </div>
+
+    <div class="drawer-sec">
+      <h4>任务队列（${tasks.length}/${n.taskTotal}）</h4>
+      <div class="task-list" id="taskList">
+        ${tasks.map(t=>`<div class="task-item"><span class="tst ${t.st}">${t.st==='idle'?'待':t.st==='run'?'执行中':'完成'}</span><span class="tname">${t.name}</span><span class="tct">${Math.floor(Math.random()*99)+1}s</span></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="drawer-sec" style="border-color:#5a4ad9">
+      <h4 style="color:#facc15">⚡ 操作</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="dbtn primary" onclick="runAgent('${nid}');showToast('已启动 ${n.name} Agent')" style="flex:1;text-align:center">▶ 启动此 Agent</div>
+        <div class="dbtn" onclick="showToast('已暂停 ${n.name} Agent')" style="flex:1;text-align:center">⏸ 暂停</div>
+        <div class="dbtn danger" onclick="showToast('已停止 ${n.name} Agent')" style="flex:1;text-align:center">⏹ 停止</div>
+        <div class="dbtn" onclick="showToast('配置已保存')" style="flex:1;text-align:center">💾 保存配置</div>
+      </div>
+    </div>
+  `;
+
+  // 绑定 input 变化
+  $('drBody').querySelectorAll('[data-cfg]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const k = inp.dataset.cfg;
+      if(k==='name') n.name = inp.value.replace(' Agent','');
+      // 其他配置存到 n 上
+      if(!n.cfg) n.cfg = {};
+      n.cfg[k] = inp.type==='checkbox'?inp.checked:inp.value;
+    });
+  });
+
+  $('drawerMask').classList.add('open');
+  $('drawer').classList.add('open');
+}
+
+function closeDrawer(){
+  $('drawerMask').classList.remove('open');
+  $('drawer').classList.remove('open');
+  state.selectedNode = null;
+  renderNodes();
+}
+
+// ========================== 运行 Agent ==========================
+function runAgent(nid){
+  const n = state.nodes.find(x=>x.id===nid);
+  if(!n) return;
+  n.status='run';
+  n.taskDone = n.taskDone||0;
+  showToast('▶ '+n.name+' Agent 已启动');
+  // 模拟任务推进
+  if(!n._runT){
+    n._runT = setInterval(()=>{
+      if(n.taskDone < n.taskTotal){
+        n.taskDone++;
+        renderNodes();
+      } else {
+        n.status='idle';
+        clearInterval(n._runT);
+        n._runT=null;
+        renderNodes();
+        showToast('✅ '+n.name+' Agent 全部完成');
+      }
+    }, 1200);
+  }
+  renderNodes();
+  updateStats();
+}
+
+// ========================== 全部运行 ==========================
+function runAll(){
+  if(state.running){showToast('已在运行中');return}
+  state.running = true;
+  showToast('▶ 全部 Agent 启动，按依赖顺序执行');
+  // 按 BFS 顺序
+  const order = topoSort();
+  let i=0;
+  function next(){
+    if(i>=order.length){
+      state.running=false;
+      showToast('✅ 全部 Agent 流水线完成');
+      return;
+    }
+    runAgent(order[i++].id);
+    setTimeout(next, 1500);
+  }
+  next();
+  updateStats();
+}
+
+function stopAll(){
+  state.running = false;
+  state.nodes.forEach(n=>{
+    n.status='idle';
+    if(n._runT){clearInterval(n._runT);n._runT=null;}
+  });
+  renderNodes();
+  updateStats();
+  showToast('⏹ 全部 Agent 已停止');
+}
+
+function topoSort(){
+  // 简单 BFS
+  const visited = new Set();
+  const result = [];
+  const start = state.nodes.find(n=>n.id==='n0') || state.nodes[0];
+  function dfs(nid){
+    if(visited.has(nid)) return;
+    visited.add(nid);
+    result.push(state.nodes.find(n=>n.id===nid));
+    state.edges.filter(e=>e.from===nid && e.type!=='feedback').forEach(e=>dfs(e.to));
+  }
+  dfs(start.id);
+  return result;
+}
+
+// ========================== 自动布局 ==========================
+function autoLayout(){
+  const cols = 5;
+  state.nodes.forEach((n,i)=>{
+    n.x = 50 + (i%cols) * (NODE_W + GRID_GAP);
+    n.y = 50 + Math.floor(i/cols) * (NODE_H + GRID_GAP);
+  });
+  renderNodes();
+  showToast('🔄 已自动布局');
+}
+
+// ========================== 导出/导入 ==========================
+function exportWorkflow(){
+  const data = {
+    nodes: state.nodes.map(n=>({id:n.id,num:n.num,name:n.name,role:n.role,color:n.color,x:n.x,y:n.y,tools:n.tools,note:n.note,taskTotal:n.taskTotal,cfg:n.cfg})),
+    edges: state.edges,
+    canvas: state.canvas,
+    exportTime: new Date().toISOString(),
+    version: '1.0'
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'workflow_'+Date.now()+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('💾 工作流已导出为 JSON 文件');
+}
+
+function importWorkflow(){
+  $('fileInput').click();
+}
+function handleImport(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      if(data.nodes && data.edges){
+        state.nodes = data.nodes;
+        state.edges = data.edges;
+        if(data.canvas) state.canvas = data.canvas;
+        renderNodes();
+        applyTransform();
+        updateStats();
+        showToast('📂 已导入 '+data.nodes.length+' 节点 / '+data.edges.length+' 连线');
+      }
+    }catch(err){showToast('❌ 导入失败: '+err.message)}
+  };
+  r.readAsText(f);
+  e.target.value = '';
+}
+
+function resetWorkflow(){
+  showDialog('重置工作流', '将清除所有自定义内容，恢复默认 10 Agent 布局。', '重置', ()=>{
+    state.nodes = defaultLayout();
+    state.edges = JSON.parse(JSON.stringify(DEFAULT_EDGES));
+    state.canvas = {x:0,y:0,scale:1};
+    state.selectedNode=null;state.selectedEdge=null;
+    renderNodes();
+    applyTransform();
+    updateStats();
+    showToast('↺ 已重置为默认工作流');
+  }, true);
+}
+
+// ========================== 统计 ==========================
+function updateStats(){
+  $('statNode').textContent = state.nodes.length;
+  $('statEdge').textContent = state.edges.length;
+  $('statRun').textContent = state.nodes.filter(n=>n.status==='run').length;
+}
+
+// ========================== 启动 ==========================
+
+// ========================== V2: 右键菜单实现 ==========================
+function showCtxMenu(x, y, items){
+  const m = $('ctxMenu');
+  m.innerHTML = items.map(it=>{
+    if(it.sep) return '<div class="ctx-sep"></div>';
+    if(it.head) return '<div class="ctx-head">'+it.head+'</div>';
+    if(it.sub) return '<div class="ctx-sub">'+it.sub+'</div>';
+    const cls = it.disabled?'ctx-item disabled':(it.danger?'ctx-item danger':'ctx-item');
+    return '<div class="'+cls+'" data-act="'+it.act+'">'+it.label+'</div>';
+  }).join('');
+  m.style.left='0px';m.style.top='0px';
+  m.classList.add('open');
+  // 定位（防溢出）
+  const w = m.offsetWidth, h = m.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  m.style.left = (x+w>vw?vw-w-8:x)+'px';
+  m.style.top = (y+h>vh?vh-h-8:y)+'px';
+  // 绑定点击
+  m.querySelectorAll('.ctx-item').forEach(el=>{
+    el.onclick = (e)=>{
+      e.stopPropagation();
+      const act = el.dataset.act;
+      if(el.classList.contains('disabled')) return;
+      hideCtxMenu();
+      const fn = window['_ctx_'+act];
+      if(fn) fn();
+    };
+  });
+}
+
+function hideCtxMenu(){
+  $('ctxMenu').classList.remove('open');
+}
+
+// 画布空白右键
+function showCanvasCtxMenu(x, y, e){
+  // 鼠标位置转画布坐标（用于"在此位置添加节点"）
+  const pt = screenToCanvas(x, y);
+  window._ctx_addAt = pt;
+  showCtxMenu(x, y, [
+    {head:'🆕 在此位置添加节点'},
+    {act:'add0',label:'0 · 总控 Agent'},
+    {act:'add1',label:'1 · 编剧 Agent'},
+    {act:'add2',label:'2 · 拆镜 Agent'},
+    {act:'add3',label:'3 · 资产生成 Agent'},
+    {act:'add4',label:'4 · 分镜编排 Agent'},
+    {act:'add5',label:'5 · 视频生成 Agent'},
+    {act:'add6',label:'6 · 音频生成 Agent'},
+    {act:'add7',label:'7 · 视频合成 Agent'},
+    {act:'add8',label:'8 · 质检 Agent'},
+    {act:'add9',label:'9 · 审片 Agent'},
+    {sep:true},
+    {head:'🎬 画布操作'},
+    {act:'autorun',label:'▶ 全部运行'},
+    {act:'stopall',label:'⏹ 全部停止'},
+    {act:'autolayout',label:'🔄 自动布局'},
+    {act:'reset',label:'↺ 重置默认'}
+  ]);
+}
+
+function addNodeAt(num, pt){
+  const def = AGENT_DEFS.find(a=>a.num===num);
+  if(!def) return;
+  const id = 'n_'+Date.now();
+  const n = {
+    id, num: def.num, name: def.name, role: def.role, color: def.color,
+    tools: [...def.tools], status:'idle', inputCount:def.inputCount,
+    outputCount:def.outputCount, taskTotal:def.taskTotal, note:def.note,
+    x: pt.x - 110, y: pt.y - 30,
+    taskDone: 0
+  };
+  state.nodes.push(n);
+  renderNodes();
+  updateStats();
+  showToast('已添加 '+def.num+' 号 '+def.name+' Agent');
+}
+
+// 节点右键
+function showNodeCtxMenu(x, y, nid){
+  const n = state.nodes.find(x=>x.id===nid);
+  if(!n) return;
+  window._ctx_nodeId = nid;
+  showCtxMenu(x, y, [
+    {head:n.num+' 号 · '+n.name+' Agent'},
+    {act:'open_'+nid,label:'📂 打开详情'},
+    {act:'run_'+nid,label:'▶ 运行'},
+    {sep:true},
+    {act:'rename_'+nid,label:'✏️ 重命名'},
+    {act:'dup_'+nid,label:'📋 复制节点'},
+    {act:'cfg_'+nid,label:'⚙️ 配置参数'},
+    {sep:true},
+    {act:'del_'+nid,label:'🗑 删除节点',danger:true}
+  ]);
+}
+
+// 连线右键
+function showEdgeCtxMenu(x, y, idx){
+  const e = state.edges[idx];
+  if(!e) return;
+  window._ctx_edgeIdx = idx;
+  showCtxMenu(x, y, [
+    {head:'连线 '+(e.from)+' → '+(e.to)},
+    {act:'label_'+idx,label:'✏️ 改标签'},
+    {act:'reverse_'+idx,label:'↔ 反向'},
+    {sep:true},
+    {act:'delEdge_'+idx,label:'🗑 删除连线',danger:true}
+  ]);
+}
+
+// 通用操作函数
+window._ctx_autorun = ()=>runAll();
+window._ctx_stopall = ()=>stopAll();
+window._ctx_autolayout = ()=>autoLayout();
+window._ctx_reset = ()=>resetWorkflow();
+window._ctx_addAt = null;
+
+// 0-9 节点添加
+for(let i=0;i<10;i++){
+  window['_ctx_add'+i] = ()=>{
+    if(window._ctx_addAt) addNodeAt(i, window._ctx_addAt);
+  };
+}
+
+// 删除节点/连线工具
+function deleteNode(nid){
+  state.nodes = state.nodes.filter(n=>n.id!==nid);
+  state.edges = state.edges.filter(e=>e.from!==nid && e.to!==nid);
+  if(state.selectedNode===nid) state.selectedNode=null;
+  renderNodes();
+  updateStats();
+}
+function deleteEdge(idx){
+  state.edges.splice(idx,1);
+  if(state.selectedEdge===idx) state.selectedEdge=null;
+  renderNodes();
+  updateStats();
+}
+
+// 节点操作（按 id 绑定）
+function bindNodeCtx(){
+  // 每次右键时重新绑定：遍历当前所有 ctx menu item
+  // 已在 showNodeCtxMenu 里通过 act 字符串隐式调用
+}
+// 通过 .act 字符串分发
+const _origShowCtxMenu = showCtxMenu;
+// 重写以支持动态 act
+const _realShowCtxMenu = showCtxMenu;
+// 模拟：每个 act 直接挂到 window
+function _bindAllCtx(){
+  // 节点操作
+  state.nodes.forEach(n=>{
+    window['_ctx_open_'+n.id] = ()=>openDrawer(n.id);
+    window['_ctx_run_'+n.id] = ()=>runAgent(n.id);
+    window['_ctx_rename_'+n.id] = ()=>{
+      const nn = prompt('重命名 Agent（不带 " Agent" 后缀）', n.name);
+      if(nn && nn.trim()){
+        n.name = nn.trim();
+        renderNodes();
+        showToast('已重命名为 '+n.name);
+      }
+    };
+    window['_ctx_dup_'+n.id] = ()=>{
+      const newId = 'n_'+Date.now();
+      const dup = {...n, id:newId, name:n.name+'(副本)', x:n.x+30, y:n.y+30, taskDone:0};
+      state.nodes.push(dup);
+      renderNodes();
+      updateStats();
+      showToast('已复制节点');
+    };
+    window['_ctx_cfg_'+n.id] = ()=>openDrawer(n.id);
+    window['_ctx_del_'+n.id] = ()=>{
+      showDialog('删除节点', '确定删除 "'+n.name+' Agent" 节点？相关连线也会一起删除。', '删除', ()=>{
+        deleteNode(n.id);
+        showToast('已删除节点');
+      }, true);
+    };
+  });
+  // 连线操作
+  state.edges.forEach((e,i)=>{
+    window['_ctx_label_'+i] = ()=>{
+      const nn = prompt('修改连线标签（留空删除）', e.label||'');
+      if(nn !== null){
+        e.label = nn.trim();
+        renderEdges();
+        showToast('标签已更新');
+      }
+    };
+    window['_ctx_reverse_'+i] = ()=>{
+      const tmp = e.from; e.from = e.to; e.to = tmp;
+      renderNodes();
+      showToast('已反向');
+    };
+    window['_ctx_delEdge_'+i] = ()=>{
+      showDialog('删除连线', '确定删除该连线？', '删除', ()=>{
+        deleteEdge(i);
+        showToast('已删除连线');
+      }, true);
+    };
+  });
+}
+_bindAllCtx();
+
+// 点击其他位置关闭菜单
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#ctxMenu')) hideCtxMenu();
+});
+document.addEventListener('contextmenu', e=>{
+  if(!e.target.closest('#ctxMenu')){
+    // 节点/连线/画布的 contextmenu 单独处理
+    if(!e.target.closest('.node') && !e.target.closest('.edge')){
+      // 是画布空白，由 wrap 的 contextmenu 处理
+    }
+  }
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') hideCtxMenu();
+});
+
+
+renderNodes();
+applyTransform();
+updateStats();
+// V3: 删 setMode('select') - 无 mode 概念
+showToast('✅ 工作流已就绪 · 左键拖空白 = 平移 · 拖端口 = 连线 · 右键 = 功能菜单', 3000);
+</script>
+</body>
+</html>
